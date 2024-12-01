@@ -128,7 +128,7 @@ func filterOutHostIP(ipList []string, hostIP string) []string {
 		if ip != hostIP {
 			filtered = append(filtered, entry)
 		} else {
-			fmt.Printf("Filtered out %s", ip)
+			fmt.Printf("Filtered out self IP: %s\n", ip)
 		}
 	}
 	return filtered
