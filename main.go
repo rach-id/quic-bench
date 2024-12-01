@@ -158,7 +158,7 @@ func readPeersFromFile(filename string) ([]string, error) {
 	var peers []string
 	for _, v := range validators {
 		// Use default port for all connections
-		peerAddr := fmt.Sprintf("%s:%d", v.IP, listenPort)
+		peerAddr := fmt.Sprintf("%s:%s", v.IP, listenPort)
 		peers = append(peers, peerAddr)
 	}
 	return peers, nil
