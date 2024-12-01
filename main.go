@@ -12,10 +12,13 @@ import (
 	"flag"
 	"fmt"
 	quic "github.com/quic-go/quic-go"
+	"io"
 	"log"
 	"math/big"
+	"net/http"
 	"os"
 	"quic-bench/trace"
+	"strings"
 	"sync"
 	"time"
 )
@@ -31,7 +34,11 @@ func main() {
 	}
 	flag.Parse()
 
-	peers := flag.Args()
+	externalIP, err := getExternalIP()
+	if err != nil {
+		log.Fatal(err)
+	}
+	peers := filterOutHostIP(flag.Args(), externalIP)
 
 	tlsConfig, err := generateTLSConfig()
 	if err != nil {
@@ -83,6 +90,46 @@ func main() {
 	}
 
 	wg.Wait()
+}
+
+// getExternalIP fetches the host's external IP address
+func getExternalIP() (string, error) {
+	// Make an HTTP GET request to an external service
+	resp, err := http.Get("https://api.ipify.org?format=text")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	// Read the response body, which contains the IP address
+	ipBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert bytes to string and trim any whitespace
+	ip := strings.TrimSpace(string(ipBytes))
+	return ip, nil
+}
+
+// filterOutHostIP filters out entries from the list that match the host's IP
+func filterOutHostIP(ipList []string, hostIP string) []string {
+	filtered := []string{}
+	for _, entry := range ipList {
+		// Split the IP:PORT string
+		ipPort := strings.Split(entry, ":")
+		if len(ipPort) != 2 {
+			// Skip invalid entries
+			continue
+		}
+		ip := ipPort[0]
+
+		// Compare with host's IP
+		if ip != hostIP {
+			filtered = append(filtered, entry)
+		}
+	}
+	return filtered
 }
 
 func generateTLSConfig() (*tls.Config, error) {
