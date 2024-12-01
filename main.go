@@ -7,12 +7,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"flag"
 	"fmt"
 	quic "github.com/quic-go/quic-go"
 	"io"
+	"io/ioutil"
 	"log"
 	"math/big"
 	"net/http"
@@ -23,22 +25,49 @@ import (
 	"time"
 )
 
-const dataSize = 500_000
+const (
+	dataSize        = 500_000
+	numberOfStreams = 4
+	connectionPort  = "4242"
+)
+
+type Validator struct {
+	Name           string `json:"name"`
+	IP             string `json:"ip"`
+	NetworkAddress string `json:"network_address"`
+	Region         string `json:"region"`
+}
 
 func main() {
 	var listenAddr string
+	var peersFile string
 	flag.StringVar(&listenAddr, "listen", "0.0.0.0:4242", "Address to listen on")
+	flag.StringVar(&peersFile, "peersFile", "peers.json", "Path to the peers JSON file")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s [-listen address] [peer1:port1] [peer2:port2] ...\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s [-listen address] [-peersFile path] [peer1:port1] [peer2:port2] ...\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+
+	// Determine peers to connect to
+	var peers []string
+	if len(flag.Args()) > 0 {
+		// Use peers specified as command-line arguments
+		peers = flag.Args()
+	} else {
+		// Read peers from the JSON file
+		var err error
+		peers, err = readPeersFromFile(peersFile)
+		if err != nil {
+			log.Fatalf("Error reading peers from file: %v", err)
+		}
+	}
 
 	externalIP, err := getExternalIP()
 	if err != nil {
 		log.Fatal(err)
 	}
-	peers := filterOutHostIP(flag.Args(), externalIP)
+	peers = filterOutHostIP(peers, externalIP)
 
 	tlsConfig, err := generateTLSConfig()
 	if err != nil {
@@ -90,6 +119,26 @@ func main() {
 	}
 
 	wg.Wait()
+}
+
+func readPeersFromFile(filename string) ([]string, error) {
+	fileBytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	var validators map[string]Validator
+	err = json.Unmarshal(fileBytes, &validators)
+	if err != nil {
+		return nil, err
+	}
+
+	var peers []string
+	for _, v := range validators {
+		peerAddr := fmt.Sprintf("%s:%s", v.IP, connectionPort)
+		peers = append(peers, peerAddr)
+	}
+	return peers, nil
 }
 
 // getExternalIP fetches the host's external IP address
@@ -187,7 +236,7 @@ func startServer(ctx context.Context, tracer *trace.LocalTracer, listenAddr stri
 	log.Printf("Server listening on %s", listenAddr)
 
 	for {
-		sess, err := listener.Accept(context.Background())
+		sess, err := listener.Accept(ctx)
 		if err != nil {
 			return err
 		}
@@ -198,81 +247,26 @@ func startServer(ctx context.Context, tracer *trace.LocalTracer, listenAddr stri
 func handleSession(ctx context.Context, tracer *trace.LocalTracer, sess quic.Connection) {
 	defer sess.CloseWithError(0, "")
 
-	// Open a stream to send data to the peer
-	stream, err := sess.OpenStreamSync(ctx)
-	if err != nil {
-		log.Println("Failed to open stream:", err)
-		return
-	}
-	go func() {
-		defer stream.Close()
-		log.Printf("Sending data to %s", sess.RemoteAddr())
-		for {
-			err = sendData(stream)
-			if err != nil {
-				log.Println("Error sending data:", err)
-				break
-			}
-			trace.WriteTimedSentBytes(tracer, "peer", sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
+	// Open multiple streams to send data to the peer
+	for i := 0; i < numberOfStreams; i++ {
+		stream, err := sess.OpenStreamSync(ctx)
+		if err != nil {
+			log.Println("Failed to open stream:", err)
+			return
 		}
-	}()
-
-	// Open a second stream
-	stream2, err := sess.OpenStreamSync(ctx)
-	if err != nil {
-		log.Println("Failed to open stream:", err)
-		return
-	}
-	go func() {
-		defer stream2.Close()
-		log.Printf("Sending data to %s", sess.RemoteAddr())
-		for {
-			err = sendData(stream2)
-			if err != nil {
-				log.Println("Error sending data:", err)
-				break
+		go func(s quic.Stream) {
+			defer s.Close()
+			log.Printf("Sending data to %s", sess.RemoteAddr())
+			for {
+				err = sendData(s)
+				if err != nil {
+					log.Println("Error sending data:", err)
+					break
+				}
+				trace.WriteTimedSentBytes(tracer, "peer", sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
 			}
-			trace.WriteTimedSentBytes(tracer, "peer", sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
-		}
-	}()
-
-	// Open a third stream
-	stream3, err := sess.OpenStreamSync(ctx)
-	if err != nil {
-		log.Println("Failed to open stream:", err)
-		return
+		}(stream)
 	}
-	go func() {
-		defer stream3.Close()
-		log.Printf("Sending data to %s", sess.RemoteAddr())
-		for {
-			err = sendData(stream3)
-			if err != nil {
-				log.Println("Error sending data:", err)
-				break
-			}
-			trace.WriteTimedSentBytes(tracer, "peer", sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
-		}
-	}()
-
-	// Open a fourth stream
-	stream4, err := sess.OpenStreamSync(ctx)
-	if err != nil {
-		log.Println("Failed to open stream:", err)
-		return
-	}
-	go func() {
-		defer stream4.Close()
-		log.Printf("Sending data to %s", sess.RemoteAddr())
-		for {
-			err = sendData(stream4)
-			if err != nil {
-				log.Println("Error sending data:", err)
-				break
-			}
-			trace.WriteTimedSentBytes(tracer, "peer", sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
-		}
-	}()
 
 	// Accept incoming streams from the peer
 	for {
@@ -288,7 +282,7 @@ func handleSession(ctx context.Context, tracer *trace.LocalTracer, sess quic.Con
 func handleStream(stream quic.Stream, addr string, tracer *trace.LocalTracer) {
 	defer stream.Close()
 
-	log.Printf("Received stream %d", stream.StreamID())
+	log.Printf("Received stream %d from %s", stream.StreamID(), addr)
 
 	// Read data from the stream
 	for {
@@ -313,23 +307,26 @@ func startClient(ctx context.Context, addr string, quicConfig *quic.Config, trac
 	}
 	defer session.CloseWithError(0, "")
 
-	// Open a stream to send data
-	stream, err := session.OpenStreamSync(ctx)
-	if err != nil {
-		return err
-	}
-	go func() {
-		defer stream.Close()
-		log.Printf("Sending data to %s", addr)
-		for {
-			err = sendData(stream)
-			if err != nil {
-				log.Println("Error sending data:", err)
-				break
-			}
-			trace.WriteTimedSentBytes(tracer, "peer", session.RemoteAddr().String(), 0x01, dataSize, time.Now())
+	// Open multiple streams to send data
+	for i := 0; i < numberOfStreams; i++ {
+		stream, err := session.OpenStreamSync(ctx)
+		if err != nil {
+			log.Println("Failed to open stream:", err)
+			return err
 		}
-	}()
+		go func(s quic.Stream) {
+			defer s.Close()
+			log.Printf("Sending data to %s", addr)
+			for {
+				err = sendData(s)
+				if err != nil {
+					log.Println("Error sending data:", err)
+					break
+				}
+				trace.WriteTimedSentBytes(tracer, "peer", session.RemoteAddr().String(), 0x01, dataSize, time.Now())
+			}
+		}(stream)
+	}
 
 	// Accept incoming streams from the server
 	for {
