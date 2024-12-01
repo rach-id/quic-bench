@@ -1,7 +1,6 @@
 package main
 
 import (
-	"QUIC-bench/trace"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -16,6 +15,7 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"quic-bench/trace"
 	"sync"
 	"time"
 )
