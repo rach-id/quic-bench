@@ -217,6 +217,63 @@ func handleSession(ctx context.Context, tracer *trace.LocalTracer, sess quic.Con
 		}
 	}()
 
+	// Open a second stream
+	stream2, err := sess.OpenStreamSync(ctx)
+	if err != nil {
+		log.Println("Failed to open stream:", err)
+		return
+	}
+	go func() {
+		defer stream2.Close()
+		log.Printf("Sending data to %s", sess.RemoteAddr())
+		for {
+			err = sendData(stream2)
+			if err != nil {
+				log.Println("Error sending data:", err)
+				break
+			}
+			trace.WriteTimedSentBytes(tracer, "peer", sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
+		}
+	}()
+
+	// Open a third stream
+	stream3, err := sess.OpenStreamSync(ctx)
+	if err != nil {
+		log.Println("Failed to open stream:", err)
+		return
+	}
+	go func() {
+		defer stream3.Close()
+		log.Printf("Sending data to %s", sess.RemoteAddr())
+		for {
+			err = sendData(stream3)
+			if err != nil {
+				log.Println("Error sending data:", err)
+				break
+			}
+			trace.WriteTimedSentBytes(tracer, "peer", sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
+		}
+	}()
+
+	// Open a fourth stream
+	stream4, err := sess.OpenStreamSync(ctx)
+	if err != nil {
+		log.Println("Failed to open stream:", err)
+		return
+	}
+	go func() {
+		defer stream4.Close()
+		log.Printf("Sending data to %s", sess.RemoteAddr())
+		for {
+			err = sendData(stream4)
+			if err != nil {
+				log.Println("Error sending data:", err)
+				break
+			}
+			trace.WriteTimedSentBytes(tracer, "peer", sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
+		}
+	}()
+
 	// Accept incoming streams from the peer
 	for {
 		incomingStream, err := sess.AcceptStream(ctx)
