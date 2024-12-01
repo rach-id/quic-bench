@@ -71,6 +71,7 @@ func main() {
 	}
 	peers = filterOutHostIP(peers, externalIP)
 
+	fmt.Printf("connecting to %d peers\n", len(peers))
 	tlsConfig, err := generateTLSConfig()
 	if err != nil {
 		log.Fatal(err)
