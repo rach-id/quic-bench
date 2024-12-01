@@ -13,6 +13,7 @@ import (
 	"flag"
 	"fmt"
 	quic "github.com/quic-go/quic-go"
+	rand2 "golang.org/x/exp/rand"
 	"io"
 	"io/ioutil"
 	"log"
@@ -28,7 +29,8 @@ import (
 const (
 	dataSize        = 500_000
 	numberOfStreams = 4
-	connectionPort  = "4242"
+	listenPort      = "4242"
+	maxValidators   = 10
 )
 
 type Validator struct {
@@ -127,15 +129,35 @@ func readPeersFromFile(filename string) ([]string, error) {
 		return nil, err
 	}
 
-	var validators map[string]Validator
-	err = json.Unmarshal(fileBytes, &validators)
+	var validatorsMap map[string]Validator
+	err = json.Unmarshal(fileBytes, &validatorsMap)
 	if err != nil {
 		return nil, err
 	}
 
+	// Convert map to slice
+	validators := make([]Validator, 0, len(validatorsMap))
+	for _, v := range validatorsMap {
+		validators = append(validators, v)
+	}
+
+	// Seed the random number generator
+	rand2.Seed(uint64(time.Now().UnixNano()))
+
+	// Shuffle the validators slice
+	rand2.Shuffle(len(validators), func(i, j int) {
+		validators[i], validators[j] = validators[j], validators[i]
+	})
+
+	// Select up to maxPeers validators
+	if len(validators) > maxValidators {
+		validators = validators[:maxValidators]
+	}
+
 	var peers []string
 	for _, v := range validators {
-		peerAddr := fmt.Sprintf("%s:%s", v.IP, connectionPort)
+		// Use default port for all connections
+		peerAddr := fmt.Sprintf("%s:%d", v.IP, listenPort)
 		peers = append(peers, peerAddr)
 	}
 	return peers, nil
