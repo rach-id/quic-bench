@@ -43,7 +43,17 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	quicConfig := &quic.Config{}
+	quicConfig := &quic.Config{
+		InitialStreamReceiveWindow:     10_000_000_000,
+		MaxStreamReceiveWindow:         10_000_000_000,
+		InitialConnectionReceiveWindow: 10_000_000_000,
+		MaxConnectionReceiveWindow:     10_000_000_000,
+		MaxIncomingStreams:             1000000000,
+		MaxIncomingUniStreams:          1000000000,
+		MaxIdleTimeout:                 time.Hour,
+		KeepAlivePeriod:                1 * time.Second,
+		EnableDatagrams:                true,
+	}
 
 	var wg sync.WaitGroup
 
