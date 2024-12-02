@@ -319,7 +319,7 @@ func handleStream(stream quic.Stream, addr string, tracer *trace.LocalTracer) {
 			continue
 		}
 		if count > 500_000 {
-			trace.WriteTimedReceivedBytes(tracer, addr, addr, 0x01, n, time.Now())
+			trace.WriteTimedReceivedBytes(tracer, addr, addr, 0x01, count, time.Now())
 			count = 0
 		} else {
 			count += n
