@@ -286,7 +286,7 @@ func handleSession(ctx context.Context, tracer *trace.LocalTracer, sess quic.Con
 					log.Println("Error sending data:", err)
 					break
 				}
-				trace.WriteTimedSentBytes(tracer, "peer", sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
+				trace.WriteTimedSentBytes(tracer, sess.RemoteAddr().String(), sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
 			}
 		}(stream)
 	}
@@ -312,9 +312,10 @@ func handleStream(stream quic.Stream, addr string, tracer *trace.LocalTracer) {
 		buf := make([]byte, dataSize)
 		_, err := stream.Read(buf)
 		if err != nil {
+			log.Println("Error reading from stream:", err)
 			return
 		}
-		trace.WriteTimedReceivedBytes(tracer, "peer", addr, 0x01, dataSize, time.Now())
+		trace.WriteTimedReceivedBytes(tracer, addr, addr, 0x01, dataSize, time.Now())
 	}
 }
 
@@ -346,7 +347,7 @@ func startClient(ctx context.Context, addr string, quicConfig *quic.Config, trac
 					log.Println("Error sending data:", err)
 					break
 				}
-				trace.WriteTimedSentBytes(tracer, "peer", session.RemoteAddr().String(), 0x01, dataSize, time.Now())
+				trace.WriteTimedSentBytes(tracer, addr, session.RemoteAddr().String(), 0x01, dataSize, time.Now())
 			}
 		}(stream)
 	}
