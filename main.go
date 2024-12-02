@@ -317,7 +317,7 @@ func handleStream(stream quic.Stream, addr string, tracer *trace.LocalTracer) {
 			log.Println("Error reading from stream:", err)
 			continue
 		}
-		trace.WriteTimedReceivedBytes(tracer, addr, addr, 0x01, dataSize, time.Now())
+		trace.WriteTimedReceivedBytes(tracer, addr, addr, 0x01, len(buf), time.Now())
 	}
 }
 
