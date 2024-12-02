@@ -309,6 +309,7 @@ func handleStream(stream quic.Stream, addr string, tracer *trace.LocalTracer) {
 
 	log.Printf("Received stream %d from %s", stream.StreamID(), addr)
 
+	count := 0
 	// Read data from the stream
 	for {
 		buf := make([]byte, dataSize)
@@ -317,7 +318,12 @@ func handleStream(stream quic.Stream, addr string, tracer *trace.LocalTracer) {
 			log.Println("Error reading from stream:", err)
 			continue
 		}
-		trace.WriteTimedReceivedBytes(tracer, addr, addr, 0x01, n, time.Now())
+		if count > 500_000 {
+			trace.WriteTimedReceivedBytes(tracer, addr, addr, 0x01, n, time.Now())
+			count = 0
+		} else {
+			count += n
+		}
 	}
 }
 
