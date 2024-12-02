@@ -312,12 +312,12 @@ func handleStream(stream quic.Stream, addr string, tracer *trace.LocalTracer) {
 	// Read data from the stream
 	for {
 		buf := make([]byte, dataSize)
-		_, err := stream.Read(buf)
+		n, err := stream.Read(buf)
 		if err != nil {
 			log.Println("Error reading from stream:", err)
 			continue
 		}
-		trace.WriteTimedReceivedBytes(tracer, addr, addr, 0x01, len(buf), time.Now())
+		trace.WriteTimedReceivedBytes(tracer, addr, addr, 0x01, n, time.Now())
 	}
 }
 
