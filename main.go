@@ -41,6 +41,11 @@ type Validator struct {
 }
 
 func main() {
+	_, err := rand.Read(data)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	var listenAddr string
 	var peersFile string
 	flag.StringVar(&listenAddr, "listen", "0.0.0.0:4242", "Address to listen on")
@@ -105,9 +110,6 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
-
-	// Give the server a moment to start
-	time.Sleep(1 * time.Second)
 
 	// Start clients to connect to peers
 	for _, addr := range peers {
@@ -284,7 +286,7 @@ func handleSession(ctx context.Context, tracer *trace.LocalTracer, sess quic.Con
 				err = sendData(s)
 				if err != nil {
 					log.Println("Error sending data:", err)
-					break
+					continue
 				}
 				trace.WriteTimedSentBytes(tracer, sess.RemoteAddr().String(), sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
 			}
@@ -313,7 +315,7 @@ func handleStream(stream quic.Stream, addr string, tracer *trace.LocalTracer) {
 		_, err := stream.Read(buf)
 		if err != nil {
 			log.Println("Error reading from stream:", err)
-			return
+			continue
 		}
 		trace.WriteTimedReceivedBytes(tracer, addr, addr, 0x01, dataSize, time.Now())
 	}
@@ -363,12 +365,9 @@ func startClient(ctx context.Context, addr string, quicConfig *quic.Config, trac
 	}
 }
 
+var data = make([]byte, dataSize)
+
 func sendData(stream quic.Stream) error {
-	data := make([]byte, dataSize)
-	_, err := rand.Read(data)
-	if err != nil {
-		return err
-	}
 	n, err := stream.Write(data)
 	if err != nil {
 		return err
