@@ -90,8 +90,6 @@ func main() {
 	quicConfig := &quic.Config{
 		MaxIncomingStreams:    1000000000,
 		MaxIncomingUniStreams: 1000000000,
-		MaxIdleTimeout:        time.Hour,
-		KeepAlivePeriod:       1 * time.Second,
 		EnableDatagrams:       true,
 	}
 
