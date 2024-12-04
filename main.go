@@ -305,6 +305,7 @@ func handleSession(ctx context.Context, tracer *trace.LocalTracer, sess quic.Con
 				}
 			}
 		}(stream)
+		time.Sleep(time.Minute)
 	}
 }
 
@@ -380,6 +381,7 @@ func startClient(ctx context.Context, addr string, quicConfig *quic.Config, trac
 				}
 			}
 		}(stream)
+		time.Sleep(time.Minute)
 	}
 	return nil
 }
