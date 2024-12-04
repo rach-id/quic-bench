@@ -268,18 +268,6 @@ func startServer(ctx context.Context, tracer *trace.LocalTracer, listenAddr stri
 func handleSession(ctx context.Context, tracer *trace.LocalTracer, sess quic.Connection) {
 	defer sess.CloseWithError(0, "")
 
-	// Accept incoming streams from the peer
-	go func() {
-		for {
-			incomingStream, err := sess.AcceptStream(ctx)
-			if err != nil {
-				log.Println("Failed to accept stream:", err)
-				return
-			}
-			go handleStream(incomingStream, sess.RemoteAddr().String(), tracer)
-		}
-	}()
-
 	// Open multiple streams to send data to the peer
 	for i := 0; i < numberOfStreams; i++ {
 		stream, err := sess.OpenStreamSync(ctx)
@@ -306,6 +294,16 @@ func handleSession(ctx context.Context, tracer *trace.LocalTracer, sess quic.Con
 			}
 		}(stream)
 		time.Sleep(time.Minute)
+	}
+
+	// Accept incoming streams from the peer
+	for {
+		incomingStream, err := sess.AcceptStream(ctx)
+		if err != nil {
+			log.Println("Failed to accept stream:", err)
+			return
+		}
+		go handleStream(incomingStream, sess.RemoteAddr().String(), tracer)
 	}
 }
 
@@ -344,18 +342,6 @@ func startClient(ctx context.Context, addr string, quicConfig *quic.Config, trac
 	}
 	defer session.CloseWithError(0, "")
 
-	go func() {
-		// Accept incoming streams from the server
-		for {
-			incomingStream, err := session.AcceptStream(ctx)
-			if err != nil {
-				log.Println("Failed to accept stream:", err)
-				continue
-			}
-			go handleStream(incomingStream, session.RemoteAddr().String(), tracer)
-		}
-	}()
-
 	// Open multiple streams to send data
 	for i := 0; i < numberOfStreams; i++ {
 		stream, err := session.OpenStreamSync(ctx)
@@ -383,7 +369,16 @@ func startClient(ctx context.Context, addr string, quicConfig *quic.Config, trac
 		}(stream)
 		time.Sleep(time.Minute)
 	}
-	return nil
+
+	// Accept incoming streams from the server
+	for {
+		incomingStream, err := session.AcceptStream(ctx)
+		if err != nil {
+			log.Println("Failed to accept stream:", err)
+			return err
+		}
+		go handleStream(incomingStream, session.RemoteAddr().String(), tracer)
+	}
 }
 
 var data = make([]byte, dataSize)
