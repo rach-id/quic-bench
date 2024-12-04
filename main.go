@@ -28,7 +28,7 @@ import (
 
 const (
 	dataSize        = 500_000
-	numberOfStreams = 1
+	numberOfStreams = 256
 	listenPort      = "4242"
 	maxValidators   = 10
 )
@@ -88,15 +88,9 @@ func main() {
 		log.Fatal(err)
 	}
 	quicConfig := &quic.Config{
-		InitialStreamReceiveWindow:     10_000_000_000,
-		MaxStreamReceiveWindow:         10_000_000_000,
-		InitialConnectionReceiveWindow: 10_000_000_000,
-		MaxConnectionReceiveWindow:     10_000_000_000,
-		MaxIncomingStreams:             1000000000,
-		MaxIncomingUniStreams:          1000000000,
-		MaxIdleTimeout:                 time.Hour,
-		KeepAlivePeriod:                1 * time.Second,
-		EnableDatagrams:                true,
+		MaxIncomingStreams:    1000000000,
+		MaxIncomingUniStreams: 1000000000,
+		EnableDatagrams:       true,
 	}
 
 	var wg sync.WaitGroup
@@ -282,15 +276,22 @@ func handleSession(ctx context.Context, tracer *trace.LocalTracer, sess quic.Con
 		go func(s quic.Stream) {
 			defer s.Close()
 			log.Printf("Sending data to %s", sess.RemoteAddr())
+			count := 0
 			for {
 				err = sendData(s)
 				if err != nil {
 					log.Println("Error sending data:", err)
 					continue
 				}
-				trace.WriteTimedSentBytes(tracer, sess.RemoteAddr().String(), sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
+				if count > 10_000_000 { // only write after 10mb
+					trace.WriteTimedSentBytes(tracer, sess.RemoteAddr().String(), sess.RemoteAddr().String(), 0x01, count, time.Now())
+					count = 0
+				} else {
+					count += dataSize
+				}
 			}
 		}(stream)
+		time.Sleep(time.Minute)
 	}
 
 	// Accept incoming streams from the peer
@@ -318,7 +319,7 @@ func handleStream(stream quic.Stream, addr string, tracer *trace.LocalTracer) {
 			log.Println("Error reading from stream:", err)
 			continue
 		}
-		if count > 500_000 {
+		if count > 10_000_000 { // only write after 10mb
 			trace.WriteTimedReceivedBytes(tracer, addr, addr, 0x01, count, time.Now())
 			count = 0
 		} else {
@@ -349,15 +350,22 @@ func startClient(ctx context.Context, addr string, quicConfig *quic.Config, trac
 		go func(s quic.Stream) {
 			defer s.Close()
 			log.Printf("Sending data to %s", addr)
+			count := 0
 			for {
 				err = sendData(s)
 				if err != nil {
 					log.Println("Error sending data:", err)
 					break
 				}
-				trace.WriteTimedSentBytes(tracer, addr, session.RemoteAddr().String(), 0x01, dataSize, time.Now())
+				if count > 10_000_000 { // only write after 10mb
+					trace.WriteTimedSentBytes(tracer, addr, session.RemoteAddr().String(), 0x01, count, time.Now())
+					count = 0
+				} else {
+					count += dataSize
+				}
 			}
 		}(stream)
+		time.Sleep(time.Minute)
 	}
 
 	// Accept incoming streams from the server
