@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	dataSize        = 500
+	dataSize        = 5_000_000
 	numberOfStreams = 4
 	listenPort      = "4242"
 	maxValidators   = 10
