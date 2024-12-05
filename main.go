@@ -282,13 +282,19 @@ func handleSession(ctx context.Context, tracer *trace.LocalTracer, sess quic.Con
 		go func(s quic.Stream) {
 			defer s.Close()
 			log.Printf("Sending data to %s", sess.RemoteAddr())
+			count := 0
 			for {
 				err = sendData(s)
 				if err != nil {
 					log.Println("Error sending data:", err)
 					continue
 				}
-				trace.WriteTimedSentBytes(tracer, sess.RemoteAddr().String(), sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
+				if count > 500_000 {
+					trace.WriteTimedSentBytes(tracer, sess.RemoteAddr().String(), sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
+					count = 0
+				} else {
+					count += dataSize
+				}
 			}
 		}(stream)
 	}
@@ -349,13 +355,19 @@ func startClient(ctx context.Context, addr string, quicConfig *quic.Config, trac
 		go func(s quic.Stream) {
 			defer s.Close()
 			log.Printf("Sending data to %s", addr)
+			count := 0
 			for {
 				err = sendData(s)
 				if err != nil {
 					log.Println("Error sending data:", err)
 					break
 				}
-				trace.WriteTimedSentBytes(tracer, addr, session.RemoteAddr().String(), 0x01, dataSize, time.Now())
+				if count > 500_000 {
+					trace.WriteTimedSentBytes(tracer, addr, session.RemoteAddr().String(), 0x01, count, time.Now())
+					count = 0
+				} else {
+					count += dataSize
+				}
 			}
 		}(stream)
 	}
