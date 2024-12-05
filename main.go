@@ -31,6 +31,7 @@ const (
 	numberOfStreams = 4
 	listenPort      = "4242"
 	maxValidators   = 10
+	LogBuffer       = 5_000_000
 )
 
 type Validator struct {
@@ -289,7 +290,7 @@ func handleSession(ctx context.Context, tracer *trace.LocalTracer, sess quic.Con
 					log.Println("Error sending data:", err)
 					continue
 				}
-				if count > 500_000 {
+				if count > LogBuffer {
 					trace.WriteTimedSentBytes(tracer, sess.RemoteAddr().String(), sess.RemoteAddr().String(), 0x01, dataSize, time.Now())
 					count = 0
 				} else {
@@ -324,7 +325,7 @@ func handleStream(stream quic.Stream, addr string, tracer *trace.LocalTracer) {
 			log.Println("Error reading from stream:", err)
 			continue
 		}
-		if count > 500_000 {
+		if count > LogBuffer {
 			trace.WriteTimedReceivedBytes(tracer, addr, addr, 0x01, count, time.Now())
 			count = 0
 		} else {
@@ -362,7 +363,7 @@ func startClient(ctx context.Context, addr string, quicConfig *quic.Config, trac
 					log.Println("Error sending data:", err)
 					break
 				}
-				if count > 500_000 {
+				if count > LogBuffer {
 					trace.WriteTimedSentBytes(tracer, addr, session.RemoteAddr().String(), 0x01, count, time.Now())
 					count = 0
 				} else {
