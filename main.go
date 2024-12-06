@@ -30,11 +30,11 @@ const (
 	dataSize        = 5_000_000
 	numberOfStreams = 4
 	listenPort      = "4242"
-	maxValidators   = 10
+	maxPeers        = 10
 	LogBuffer       = 5_000_000
 )
 
-type Validator struct {
+type Peer struct {
 	Name           string `json:"name"`
 	IP             string `json:"ip"`
 	NetworkAddress string `json:"network_address"`
@@ -133,38 +133,38 @@ func readPeersFromFile(filename string) ([]string, error) {
 		return nil, err
 	}
 
-	var validatorsMap map[string]Validator
-	err = json.Unmarshal(fileBytes, &validatorsMap)
+	var peersMap map[string]Peer
+	err = json.Unmarshal(fileBytes, &peersMap)
 	if err != nil {
 		return nil, err
 	}
 
 	// Convert map to slice
-	validators := make([]Validator, 0, len(validatorsMap))
-	for _, v := range validatorsMap {
-		validators = append(validators, v)
+	peers := make([]Peer, 0, len(peersMap))
+	for _, v := range peersMap {
+		peers = append(peers, v)
 	}
 
 	// Seed the random number generator
 	rand2.Seed(uint64(time.Now().UnixNano()))
 
-	// Shuffle the validators slice
-	rand2.Shuffle(len(validators), func(i, j int) {
-		validators[i], validators[j] = validators[j], validators[i]
+	// Shuffle the peers slice
+	rand2.Shuffle(len(peers), func(i, j int) {
+		peers[i], peers[j] = peers[j], peers[i]
 	})
 
-	// Select up to maxPeers validators
-	if len(validators) > maxValidators {
-		validators = validators[:maxValidators]
+	// Select up to maxPeers peers
+	if len(peers) > maxPeers {
+		peers = peers[:maxPeers]
 	}
 
-	var peers []string
-	for _, v := range validators {
+	var peersIPs []string
+	for _, v := range peers {
 		// Use default port for all connections
 		peerAddr := fmt.Sprintf("%s:%s", v.IP, listenPort)
-		peers = append(peers, peerAddr)
+		peersIPs = append(peersIPs, peerAddr)
 	}
-	return peers, nil
+	return peersIPs, nil
 }
 
 // getExternalIP fetches the host's external IP address
