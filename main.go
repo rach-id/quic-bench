@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	dataSize        = 500_000
-	numberOfStreams = 50
+	dataSize        = 25_000_000
+	numberOfStreams = 1
 	listenPort      = "4242"
 	maxPeers        = 10
 	LogBuffer       = 5_000_000
